@@ -2,19 +2,21 @@ import pulp
 import time
 import dimod
 from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
+import neal
 
 # Costs of placing object i in box j
 # For example, cost[i][j] represents the cost of placing object i in box j
 
+# box - SV - V1, I12, I23
 cost = [
-    [10, 20, 15],  # Object 1 can be placed in box 1, 2, or 3 with respective costs
-    [25, 30, 5],   # Object 2 can be placed in box 1, 2, or 3 with respective costs
-    [8, 22, 17],   # Object 3 can be placed in box 1, 2, or 3 with respective costs
-    [30, 18, 10],  # Object 4 can be placed in box 1, 2, or 3 with respective costs
-    [12, None, 16], # Object 5 can be placed in box 1 or 3 but not in box 2
-    [None, 14, 22], # Object 6 can be placed in box 2 or 3 but not in box 1
-    [20, None, 18], # Object 7 can be placed in box 1 or 3 but not in box 2
-    [9, 21, None]  # Object 8 can be placed in box 1 or 2 but not in box 3
+    [300, None, None],   # Object 1 - V1
+    [120, 120, None],    # Object 2 - V2
+    [140, 140, 140],    # Object 3 - V3
+    [None, 150, None],   # Object 4 - I1
+    [None, 160, 160], # Object 5 - I2 
+    [None, None, 150], # Object 6 - I3
+    [None, 300, None], # Object 7 - I12
+    [None, None, 300]   # Object 8 - I23
 ]
 
 # Define objects, boxes, and costs
@@ -66,8 +68,8 @@ for i in range(num_objects):
 linear = {}
 quadratic = {}
 # Define penalty multipliers
-lambda_object = 20 # Penalize placing an object in more than one box
-lambda_box = 20     # Penalize placing more than one object in a box
+lambda_object = 600 # Penalize placing an object in more than one box
+lambda_box = 600    # Penalize placing more than one object in a box
 
 #### new quantum ####
 num_objects = len(cost)
@@ -104,68 +106,70 @@ for j in range(num_boxes):
         lagrange_multiplier=lambda_box
     )
 
+# number of reads 
+n_reads = 100
+
+
+# simulated aneealer
+#sampler = dimod.SimulatedAnnealingSampler()
+sampler = neal.sampler.SimulatedAnnealingSampler()
+
 # Solve the BQM using the D-Wave Hybrid Sampler
 sampler_hybrid = LeapHybridSampler()
+
 # Solve the problem using a D-Wave sampler
-sampler = EmbeddingComposite(DWaveSampler())
+sampler_qpu = EmbeddingComposite(DWaveSampler())
 
-# Run D-Wave quantum solver and measure time
-start_time_quantum = time.time()
-sampleset = sampler.sample(bqm, num_reads=100)
-end_time_quantum = time.time()
-quantum_time = end_time_quantum - start_time_quantum
 
-# Run D-Wave quantum solver and measure time
-start_time_quantum_hybrid = time.time()
-sampleset_hybrid = sampler_hybrid.sample(bqm, num_reads=100)
-end_time_quantum_hybrid = time.time()
-quantum_time_hybrid = end_time_quantum_hybrid - start_time_quantum_hybrid
+start_sim = time.time()
+sampleset = sampler.sample(bqm, num_reads=n_reads) 
+end_sim = time.time()
+
+start_hybrid = time.time()
+sampleset_hybrid = sampler_hybrid.sample(bqm) 
+end_hybrid = time.time()
+
+start_qpu = time.time()
+sampleset_qpu = sampler_qpu.sample(bqm) 
+end_qpu = time.time()
+
+# Output total time taken:
+print("Time taken by simulated annealer: ", start_sim - end_sim)
+print("Time taken by hybrid solver: ", start_hybrid - end_hybrid)
+print("Time taken by QPU solver: ", start_qpu - end_qpu)
+
+# Output the results
+print("Simulated Annealer Solution Objective value:", sampleset.first.energy)
+#print("Hybrid Solution Objective value:", sampleset_hybrid.first.energy)
+#print("QPU Solution Objective value:", sampleset_qpu.first.energy)
+
 
 # Get the best solution
 best_solution = sampleset.first.sample
+best_solution_hybrid = sampleset_hybrid.first.sample
+best_solution_qpu = sampleset_qpu.first.sample
 
-# Manual feasibility check
-feasible = True
-
-# Check object assignment constraints (each object must be assigned to at most one box)
-for i in range(num_objects):
-    assigned_boxes = sum(best_solution[f'x_{i}_{j}'] for j in range(num_boxes) if cost[i][j] is not None)
-    if assigned_boxes > 1:
-        feasible = False
-        print(f"Object {i + 1} is assigned to {assigned_boxes} boxes, which violates the constraints.")
-
-# Check box assignment constraints (each box must contain exactly one object)
-for j in range(num_boxes):
-    assigned_objects = sum(best_solution[f'x_{i}_{j}'] for i in range(num_objects) if cost[i][j] is not None)
-    if assigned_objects != 1:
-        feasible = False
-        print(f"Box {j + 1} has {assigned_objects} objects, which violates the constraints.")
-
-if feasible:
-    print("Quantum Found a feasible solution!")
-else:
-    print("Quantum No feasible solution found.")
-
-# Output the results
-print("Objective value:", sampleset.first.energy)
 for i in range(num_objects):
     for j in range(num_boxes):
         var_name = f'x_{i}_{j}'
         if best_solution.get(var_name) == 1:
-            print(f"Object {i + 1} is placed in Box {j + 1}")
+            print(f"Simulated Annealer: Object {i + 1} is placed in Box {j + 1}")
+        if best_solution_hybrid.get(var_name) == 1:
+            print(f"Hybrid Solver: Object {i + 1} is placed in Box {j + 1}")
+        if best_solution_qpu.get(var_name) == 1:
+            print(f"QPU: Object {i + 1} is placed in Box {j + 1}")
 
 
-##################### Comparison of execution time of Classical and Quantum ################
-# Compare execution times
-print(f"Classical solver execution time: {classical_time} seconds")
-print(f"Quantum solver execution time: {quantum_time} seconds")
-print(f"Quantum hybrid solver execution time: {quantum_time_hybrid} seconds")
 
-# Compare results (cost)
-classical_cost = pulp.value(problem.objective)
-
-# Initialize quantum_cost
-quantum_cost = sampleset.first.energy
-
-print(f"Classical solver cost: {classical_cost}")
-print(f"Quantum solver cost: {quantum_cost}")
+print("All combinations with similar energy (with QPU):")
+option = 1
+for s in sampleset_qpu.data():
+    if s.energy == sampleset_qpu.first.energy:
+        print(s)
+        print(f"---- Option {option}-----")
+        option += 1
+        for i in range(num_objects):
+            for j in range(num_boxes):
+                var_name = f'x_{i}_{j}'
+                if s.sample.get(var_name) == 1:
+                    print(f"Quantum: Object {i + 1} is placed in Box {j + 1}")

@@ -3,6 +3,7 @@ import time
 import dimod
 from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
 import neal
+import dwave.inspector
 
 # Costs of placing object i in box j
 # For example, cost[i][j] represents the cost of placing object i in box j
@@ -54,13 +55,13 @@ classical_time = end_time_classical - start_time_classical
 print("Classical Solution")
 print("Status :", pulp.LpStatus[problem.status])
 print("Total Cost :", pulp.value(problem.objective))
+print("Total time taken by classical solver: ", classical_time)
 
 # Print object assignments
 for i in range(num_objects):
     for j in range(num_boxes):
         if pulp.value(x[i][j]) == 1:
             print(f"Classical: Object {i+1} is placed in Box {j+1}")
-
 
 ############################### QUANTUM #########################
 
@@ -130,35 +131,49 @@ sampleset_hybrid = sampler_hybrid.sample(bqm)
 end_hybrid = time.time()
 
 start_qpu = time.time()
-sampleset_qpu = sampler_qpu.sample(bqm) 
+sampleset_qpu = sampler_qpu.sample(bqm, num_reads=n_reads) 
 end_qpu = time.time()
 
 # Output total time taken:
-print("Time taken by simulated annealer: ", start_sim - end_sim)
-print("Time taken by hybrid solver: ", start_hybrid - end_hybrid)
-print("Time taken by QPU solver: ", start_qpu - end_qpu)
+print("Time taken by simulated annealer: ", end_sim - start_sim)
+print("Time taken by hybrid solver: ", end_hybrid - start_hybrid)
+print("Time taken by QPU solver: ", end_qpu - start_qpu)
 
 # Output the results
 print("Simulated Annealer Solution Objective value:", sampleset.first.energy)
-#print("Hybrid Solution Objective value:", sampleset_hybrid.first.energy)
-#print("QPU Solution Objective value:", sampleset_qpu.first.energy)
+print("Hybrid Solution Objective value:", sampleset_hybrid.first.energy)
+print("QPU Solution Objective value:", sampleset_qpu.first.energy)
 
+print("\sampleset_qpu:")
+print(sampleset_qpu)
+# open inspector
+dwave.inspector.show(sampleset_qpu)
 
 # Get the best solution
 best_solution = sampleset.first.sample
 best_solution_hybrid = sampleset_hybrid.first.sample
 best_solution_qpu = sampleset_qpu.first.sample
 
+print("----Best solution from simulated annealer:----")
 for i in range(num_objects):
     for j in range(num_boxes):
         var_name = f'x_{i}_{j}'
         if best_solution.get(var_name) == 1:
             print(f"Simulated Annealer: Object {i + 1} is placed in Box {j + 1}")
+
+print("----Best solution from hybrid solvers:----")
+for i in range(num_objects):
+    for j in range(num_boxes):
+        var_name = f'x_{i}_{j}'
         if best_solution_hybrid.get(var_name) == 1:
             print(f"Hybrid Solver: Object {i + 1} is placed in Box {j + 1}")
-        if best_solution_qpu.get(var_name) == 1:
-            print(f"QPU: Object {i + 1} is placed in Box {j + 1}")
 
+print("----Best solution from QPU:----")
+for i in range(num_objects):
+    for j in range(num_boxes):
+        var_name = f'x_{i}_{j}'
+        if best_solution_qpu.get(var_name) == 1:
+            print(f"QPU Solver: Object {i + 1} is placed in Box {j + 1}")
 
 
 print("All combinations with similar energy (with QPU):")

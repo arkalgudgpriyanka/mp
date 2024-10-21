@@ -6,36 +6,30 @@ import dwave.inspector
 from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridSampler
 
 # Number of objects and boxes
-num_objects = 8
-num_boxes = 3
+num_objects = 5
+num_boxes = 2
 
 # Costs of objects for each box (None means the object cannot be assigned to that box)
 # box - SV - V1, I12, I23
 costs = [
-    [300, None, None],   # Object 1 - V1
-    [120, 120, None],    # Object 2 - V2
-    [140, 140, 140],    # Object 3 - V3
-    [None, 150, None],   # Object 4 - I1
-    [None, 160, 160], # Object 5 - I2 
-    [None, None, 150], # Object 6 - I3
-    [None, 300, None], # Object 7 - I12
-    [None, None, 300]   # Object 8 - I23
+    [300, None],   # Object 1 - V1
+    [120, 120],    # Object 2 - V2
+    [None, 150],   # Object 3 - I1
+    [None, 160], # Object 4 - I2 
+    [None, 300] # Object 5 - I12
 ]
 
 # Define profits for objects in each box (same format as costs)
 profits = [
-    [10, None, None],   # Object 1 - V1
-    [6, 6, None],    # Object 2 - V2
-    [4, 4, 4],    # Object 3 - V3
-    [None, 8, None],   # Object 4 - I1
-    [None, 8, 8], # Object 5 - I2 
-    [None, None, 8], # Object 6 - I3
-    [None, 10, None], # Object 7 - I12
-    [None, None, 10]   # Object 8 - I23
+    [10, None],   # Object 1 - V1
+    [6, 6],    # Object 2 - V2
+    [None, 8],   # Object 4 - I1
+    [None, 8], # Object 5 - I2 
+    [None, 10] # Object 7 - I12
 ]
 
 # Global budget for all boxes combined
-global_budget = 500  # Example budget
+global_budget = 300  # Example budget
 
 
 ##################### CLASSICAL ######################################
@@ -133,9 +127,8 @@ bqm.add_linear_inequality_constraint(cost_constraints,
                                     lagrange_multiplier=lambda_budget,
                                     label='total_cost_limit')
 
-
 # number of reads
-n_reads = 5000
+n_reads = 1000
 
 # simulated aneealer
 sampler = neal.sampler.SimulatedAnnealingSampler()
@@ -171,6 +164,7 @@ print("QPU Solution Objective value:", -sampleset_qpu.first.energy)
 print("\sampleset_qpu:")
 print(sampleset_qpu.first)
 #print(sampleset_qpu)
+
 # open inspector
 dwave.inspector.show(sampleset_qpu)
 
@@ -200,9 +194,7 @@ for i in range(num_objects):
         if best_solution_qpu.get(var_name) == 1:
             print(f"Object {i + 1} is placed in Box {j + 1}")
 
-embedding = sampleset_qpu.info['embedding_context']['embedding']
-print(f"Number of logical variables: {len(embedding.keys())}")
-print(f"Number of physical qubits used in embedding: {sum(len(chain) for chain in embedding.values())}")
+
 
 print("All combinations with similar energy (with QPU):")
 option = 1
@@ -224,25 +216,3 @@ for s in sampleset_qpu.data():
         print("Total profits incurred: ", total_profit)
 
 print("total options with similar energy: ", option-1)
-
-
-print("Print first 5 QPU samples")
-
-res = 1
-for s in sampleset_qpu.data():
-        print(f"---- Quantum result {res}-----")
-        total_cost = 0
-        total_profit = 0
-        res += 1
-        for i in range(num_objects):
-            for j in range(num_boxes):
-                var_name = f'x_{i}_{j}'
-                if s.sample.get(var_name) == 1:
-                    print(f"Object {i + 1} is placed in Box {j + 1}")
-                    total_cost = total_cost + costs[i][j]
-                    total_profit = total_profit + profits[i][j]
-        print("Energy: ", -s.energy)
-        print("Total costs incurred: ", total_cost)
-        print("Total profits incurred: ", total_profit)
-        if res == 6:
-            break

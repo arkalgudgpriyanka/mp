@@ -24,7 +24,7 @@ cost = [
 num_objects = len(cost)
 num_boxes = len(cost[0])
 
-
+#################################### CLASSICAL #############################################
 # Define the problem
 problem = pulp.LpProblem("Object_Assignment", pulp.LpMinimize)
 
@@ -149,6 +149,11 @@ print(sampleset_qpu)
 # open inspector
 dwave.inspector.show(sampleset_qpu)
 
+
+embedding = sampleset_qpu.info['embedding_context']['embedding']
+print(f"Number of logical variables: {len(embedding.keys())}")
+print(f"Number of physical qubits used in embedding: {sum(len(chain) for chain in embedding.values())}")
+
 # Get the best solution
 best_solution = sampleset.first.sample
 best_solution_hybrid = sampleset_hybrid.first.sample
@@ -188,3 +193,5 @@ for s in sampleset_qpu.data():
                 var_name = f'x_{i}_{j}'
                 if s.sample.get(var_name) == 1:
                     print(f"Quantum: Object {i + 1} is placed in Box {j + 1}")
+
+print("total options with similar energy: ", option-1)
